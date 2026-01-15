@@ -12,24 +12,34 @@ Fogo doesn't have an archival node at the time of creation. RPC nodes prune hist
 
 ## Solution
 
-Fogoscan indexes all Fogo transactions. This shim provides a Solana-compatible JSON-RPC interface that fetches historical data from Fogoscan's API.
+Fogoscan indexes all Fogo transactions. This shim provides an SVM-compatible JSON-RPC interface that fetches historical data from Fogoscan's API. All other RPC methods are proxied to a configurable public RPC endpoint, making this a drop-in replacement for direct RPC access.
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│                 │     │                 │     │                 │
-│  Your App       │────▶│  fogo-scan-shim │────▶│  Fogoscan API   │
-│                 │◀────│                 │◀────│                 │
-│                 │     │                 │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                              ┌─────────────────┐
+                                         ┌───▶│  Fogoscan API   │
+                                         │    │  (historical)   │
+┌─────────────────┐     ┌─────────────────┐    └─────────────────┘
+│                 │     │                 │
+│  Your App       │────▶│  fogo-scan-shim │
+│                 │◀────│                 │
+│                 │     │                 │    ┌─────────────────┐
+└─────────────────┘     └─────────────────┘    │  Public RPC     │
+                                         └───▶│  (passthrough)  │
+                                              └─────────────────┘
 ```
 
-## Supported RPC Methods
+## RPC Methods
+
+### Handled by Fogoscan
 
 | Method | Description |
 |--------|-------------|
 | `getTransaction` | Fetch transaction by signature |
 | `getBlock` | Fetch block transactions by slot |
-| `getHealth` | Returns `"ok"` |
+
+### Proxied to Public RPC
+
+All other methods (including `getHealth`, `getSlot`, `getBlockHeight`, etc.) are proxied to the configured public RPC URL.
 
 ### getTransaction
 
@@ -47,12 +57,13 @@ curl -X POST http://localhost:8899 \
   -d '{"jsonrpc":"2.0","id":1,"method":"getBlock","params":[161800848]}'
 ```
 
-### getHealth
+### Other Methods (Proxied)
 
 ```bash
+# getHealth, getSlot, etc. are proxied to public RPC
 curl -X POST http://localhost:8899 \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"getSlot"}'
 ```
 
 ## Setup
@@ -79,6 +90,7 @@ Required environment variables:
 | Variable | Description |
 |----------|-------------|
 | `FOGOSCAN_API_URL` | Fogoscan API base URL |
+| `PUBLIC_RPC_URL` | Public RPC URL for proxying non-handled methods |
 | `PORT` | Port to listen on |
 
 ## Run Locally
@@ -100,6 +112,7 @@ docker build -t fogo-scan-shim .
 # Run
 docker run -d -p 8899:8899 \
   -e FOGOSCAN_API_URL=https://api.fogoscan.com \
+  -e PUBLIC_RPC_URL=https://rpc.fogo.io \
   -e PORT=8899 \
   fogo-scan-shim
 ```

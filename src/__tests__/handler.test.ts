@@ -1,12 +1,17 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import type { FogoscanTransactionResponse } from '../types.js';
+import type { FogoscanTransactionResponse, JsonRpcResponse } from '../types.js';
 
 const mockGetTransaction = jest.fn<() => Promise<FogoscanTransactionResponse | null>>();
 const mockGetBlockTransactions = jest.fn<() => Promise<FogoscanTransactionResponse[] | null>>();
+const mockProxyRequest = jest.fn<(req: unknown) => Promise<JsonRpcResponse>>();
 
 jest.unstable_mockModule('../services/fogoscan.js', () => ({
   getTransaction: mockGetTransaction,
   getBlockTransactions: mockGetBlockTransactions,
+}));
+
+jest.unstable_mockModule('../services/rpc-proxy.js', () => ({
+  proxyRequest: mockProxyRequest,
 }));
 
 const { handleRpcRequest } = await import('../handlers/rpc.js');
@@ -17,18 +22,22 @@ describe('handleRpcRequest', () => {
   });
 
   describe('getHealth', () => {
-    it('returns ok', async () => {
-      const result = await handleRpcRequest({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getHealth',
-      });
-
-      expect(result).toEqual({
+    it('proxies to public RPC', async () => {
+      mockProxyRequest.mockResolvedValue({
         jsonrpc: '2.0',
         id: 1,
         result: 'ok',
       });
+
+      const request = {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getHealth',
+      };
+      const result = await handleRpcRequest(request);
+
+      expect(mockProxyRequest).toHaveBeenCalledWith(request);
+      expect(result.result).toBe('ok');
     });
   });
 
@@ -145,16 +154,23 @@ describe('handleRpcRequest', () => {
     });
   });
 
-  describe('unsupported methods', () => {
-    it('returns error for unknown method', async () => {
-      const result = await handleRpcRequest({
+  describe('proxied methods', () => {
+    it('proxies unknown methods to public RPC', async () => {
+      mockProxyRequest.mockResolvedValue({
+        jsonrpc: '2.0',
+        id: 1,
+        result: 123456789,
+      });
+
+      const request = {
         jsonrpc: '2.0',
         id: 1,
         method: 'getSlot',
-      });
+      };
+      const result = await handleRpcRequest(request);
 
-      expect(result.error?.code).toBe(-32601);
-      expect(result.error?.message).toContain('unsupported');
+      expect(mockProxyRequest).toHaveBeenCalledWith(request);
+      expect(result.result).toBe(123456789);
     });
   });
 });

@@ -1,8 +1,10 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { config } from './config.js';
+import { RpcErrorCode } from './constants.js';
 import { handleRpcRequest } from './handlers/rpc.js';
 import type { JsonRpcRequest } from './types.js';
+import { rpcError } from './types.js';
 
 const fastify = Fastify({ logger: false });
 
@@ -13,12 +15,8 @@ fastify.get('/health', async () => ({ status: 'ok' }));
 fastify.post('/', async (request, reply) => {
   const body = request.body as JsonRpcRequest;
 
-  if (!body || !body.method) {
-    return reply.status(400).send({
-      jsonrpc: '2.0',
-      id: null,
-      error: { code: -32600, message: 'Invalid Request' },
-    });
+  if (!body?.method) {
+    return reply.status(400).send(rpcError(null, RpcErrorCode.INVALID_REQUEST, 'Invalid Request'));
   }
 
   return handleRpcRequest(body);

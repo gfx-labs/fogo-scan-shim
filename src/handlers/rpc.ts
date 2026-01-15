@@ -1,57 +1,66 @@
 import type { JsonRpcRequest, JsonRpcResponse } from '../types.js';
+import { rpcResult, rpcError } from '../types.js';
+import { RpcErrorCode } from '../constants.js';
 import { getTransaction, getBlockTransactions } from '../services/fogoscan.js';
 import { transformTransaction } from '../transformers/transaction.js';
+import { proxyRequest } from '../services/rpc-proxy.js';
+
+function elapsedMs(start: number): number {
+  return Date.now() - start;
+}
+
+function truncateSignature(sig: string): string {
+  return `${sig.slice(0, 12)}...`;
+}
 
 export async function handleRpcRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
   const { method, params, id } = request;
   const start = Date.now();
 
   switch (method) {
-    case 'getHealth':
-      return { jsonrpc: '2.0', id, result: 'ok' };
-
     case 'getTransaction': {
-      const sig = params?.[0] as string;
-      if (!sig) {
-        return { jsonrpc: '2.0', id, error: { code: -32602, message: 'missing signature' } };
+      const signature = params?.[0] as string;
+      if (!signature) {
+        return rpcError(id, RpcErrorCode.INVALID_PARAMS, 'missing signature');
       }
 
-      const result = await getTransaction(sig);
-      const ms = Date.now() - start;
+      const result = await getTransaction(signature);
+      const ms = elapsedMs(start);
+      const sigShort = truncateSignature(signature);
 
       if (result) {
-        console.log(`getTransaction ${sig.slice(0, 12)}... slot=${result.data.block_id} ${ms}ms`);
-        return { jsonrpc: '2.0', id, result: transformTransaction(result) };
+        console.log(`getTransaction ${sigShort} slot=${result.data.block_id} ${ms}ms`);
+        return rpcResult(id, transformTransaction(result));
       }
 
-      console.log(`getTransaction ${sig.slice(0, 12)}... not found ${ms}ms`);
-      return { jsonrpc: '2.0', id, result: null };
+      console.log(`getTransaction ${sigShort} not found ${ms}ms`);
+      return rpcResult(id, null);
     }
 
     case 'getBlock': {
       const slot = params?.[0] as number;
       if (slot === undefined) {
-        return { jsonrpc: '2.0', id, error: { code: -32602, message: 'missing slot' } };
+        return rpcError(id, RpcErrorCode.INVALID_PARAMS, 'missing slot');
       }
 
-      const txs = await getBlockTransactions(slot);
-      const ms = Date.now() - start;
+      const transactions = await getBlockTransactions(slot);
+      const ms = elapsedMs(start);
 
-      if (txs) {
-        console.log(`getBlock ${slot} txs=${txs.length} ${ms}ms`);
-        return {
-          jsonrpc: '2.0',
-          id,
-          result: { blockHeight: slot, transactions: txs.map(tx => transformTransaction(tx)) },
-        };
+      if (transactions) {
+        console.log(`getBlock ${slot} txs=${transactions.length} ${ms}ms`);
+        return rpcResult(id, {
+          blockHeight: slot,
+          transactions: transactions.map(transformTransaction),
+        });
       }
 
       console.log(`getBlock ${slot} not found ${ms}ms`);
-      return { jsonrpc: '2.0', id, result: null };
+      return rpcResult(id, null);
     }
 
-    default:
-      console.log(`unsupported method: ${method}`);
-      return { jsonrpc: '2.0', id, error: { code: -32601, message: `unsupported: ${method}` } };
+    default: {
+      console.log(`proxying method: ${method}`);
+      return proxyRequest(request);
+    }
   }
 }

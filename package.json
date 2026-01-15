@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "JSON-RPC proxy shim that serves historical Fogo transaction data from Fogoscan API",
   "author": "Curt Bryan <https://github.com/CurtBryan>",
-  "repository": "https://github.com/CurtBryan/fogo-scan-shim",
+  "repository": "https://github.com/gfx-labs/fogo-scan-shim",
   "license": "MIT",
   "main": "src/index.ts",
   "type": "module",
