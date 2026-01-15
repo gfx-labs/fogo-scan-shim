@@ -19,13 +19,17 @@ describe('transformTransaction', () => {
         { address: 'addr1', pre_balance: 1000000, post_balance: 900000, change_amount: -100000 },
         { address: 'addr2', pre_balance: 500000, post_balance: 600000, change_amount: 100000 },
       ],
-      account_keys: ['addr1', 'addr2', 'programId'],
+      account_keys: [
+        { pubkey: 'addr1', writable: true, signer: true, source: 'transaction' },
+        { pubkey: 'addr2', writable: true, signer: false, source: 'transaction' },
+        { pubkey: 'programId', writable: false, signer: false, source: 'transaction' },
+      ],
       parsed_instructions: [
         {
-          index: 0,
+          ins_index: 0,
           program_id: 'programId',
           accounts: ['addr1', 'addr2'],
-          data: 'base64data',
+          data_raw: 'base64data',
         },
       ],
       recentBlockhash: 'GHtXQBsoZHVnNFa9YevAzFr17DJjgHXk3ycTKD5xD3Zi',
@@ -75,9 +79,33 @@ describe('transformTransaction', () => {
     expect(result.meta.err).toEqual({ error: 'failed' });
   });
 
-  it('maps accountKeys', () => {
+  it('maps accountKeys as strings', () => {
     const result = transformTransaction(mockFogoscanResponse);
     expect(result.transaction.message.accountKeys).toEqual(['addr1', 'addr2', 'programId']);
+  });
+
+  it('maps header from account metadata', () => {
+    const result = transformTransaction(mockFogoscanResponse);
+    expect(result.transaction.message.header).toEqual({
+      numRequiredSignatures: 1,
+      numReadonlySignedAccounts: 0,
+      numReadonlyUnsignedAccounts: 1,
+    });
+  });
+
+  it('includes version', () => {
+    const result = transformTransaction(mockFogoscanResponse);
+    expect(result.version).toBe(0);
+  });
+
+  it('includes status Ok for successful tx', () => {
+    const result = transformTransaction(mockFogoscanResponse);
+    expect(result.meta.status).toEqual({ Ok: null });
+  });
+
+  it('includes stackHeight in instructions', () => {
+    const result = transformTransaction(mockFogoscanResponse);
+    expect(result.transaction.message.instructions[0].stackHeight).toBe(1);
   });
 
   it('maps recentBlockhash', () => {

@@ -1,3 +1,5 @@
+import { JSON_RPC_VERSION } from './constants.js';
+
 export interface JsonRpcRequest {
   jsonrpc: string;
   id: number | string;
@@ -5,15 +7,27 @@ export interface JsonRpcRequest {
   params?: unknown[];
 }
 
+export interface JsonRpcError {
+  code: number;
+  message: string;
+  data?: unknown;
+}
+
 export interface JsonRpcResponse<T = unknown> {
   jsonrpc: string;
   id: number | string;
   result?: T;
-  error?: {
-    code: number;
-    message: string;
-    data?: unknown;
-  };
+  error?: JsonRpcError;
+}
+
+export type RequestId = number | string | null;
+
+export function rpcResult<T>(id: RequestId, result: T): JsonRpcResponse<T> {
+  return { jsonrpc: JSON_RPC_VERSION, id: id ?? 0, result };
+}
+
+export function rpcError(id: RequestId, code: number, message: string): JsonRpcResponse {
+  return { jsonrpc: JSON_RPC_VERSION, id: id ?? 0, error: { code, message } };
 }
 
 export interface FogoscanBalanceChange {
@@ -24,13 +38,20 @@ export interface FogoscanBalanceChange {
 }
 
 export interface FogoscanInstruction {
-  index: number;
+  ins_index: number;
   program_id: string;
-  program_name?: string;
-  parsed?: unknown;
+  program?: string;
+  type?: string;
+  parsed_type?: string;
   accounts?: string[];
-  data?: string;
-  inner_instructions?: FogoscanInstruction[];
+  data_raw?: string;
+}
+
+export interface FogoscanAccountKey {
+  pubkey: string;
+  writable: boolean;
+  signer: boolean;
+  source: string;
 }
 
 export interface FogoscanTransactionData {
@@ -40,11 +61,15 @@ export interface FogoscanTransactionData {
   fee: number;
   logMessage: string[];
   sol_bal_change: FogoscanBalanceChange[];
-  account_keys: string[];
+  account_keys: FogoscanAccountKey[];
   parsed_instructions: FogoscanInstruction[];
   recentBlockhash: string;
   status: number;
   signatures?: string[];
+  compute_units_consumed?: number;
+  version?: number;
+  addressTableLookups?: unknown[];
+  list_signer?: string[];
 }
 
 export interface FogoscanTransactionResponse {
@@ -58,15 +83,37 @@ export interface SolanaTransactionMeta {
   logMessages: string[];
   preBalances: number[];
   postBalances: number[];
-  innerInstructions?: unknown[];
-  preTokenBalances?: unknown[];
-  postTokenBalances?: unknown[];
+  innerInstructions: unknown[];
+  preTokenBalances: unknown[];
+  postTokenBalances: unknown[];
+  computeUnitsConsumed: number;
+  loadedAddresses: {
+    readonly: string[];
+    writable: string[];
+  };
+  rewards: unknown[];
+  status: { Ok: null } | { Err: unknown };
+}
+
+export interface SolanaMessageHeader {
+  numRequiredSignatures: number;
+  numReadonlySignedAccounts: number;
+  numReadonlyUnsignedAccounts: number;
+}
+
+export interface SolanaInstruction {
+  programIdIndex: number;
+  accounts: number[];
+  data: string;
+  stackHeight: number;
 }
 
 export interface SolanaTransactionMessage {
   accountKeys: string[];
   recentBlockhash: string;
-  instructions: unknown[];
+  instructions: SolanaInstruction[];
+  header: SolanaMessageHeader;
+  addressTableLookups: unknown[];
 }
 
 export interface SolanaTransaction {
@@ -79,4 +126,5 @@ export interface SolanaTransactionResult {
   blockTime: number | null;
   meta: SolanaTransactionMeta;
   transaction: SolanaTransaction;
+  version: number;
 }
