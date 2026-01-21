@@ -44,7 +44,7 @@ export interface FogoscanInstruction {
   type?: string;
   parsed_type?: string;
   accounts?: string[];
-  data_raw?: string;
+  data_raw?: string | object;
 }
 
 export interface FogoscanAccountKey {
@@ -127,4 +127,67 @@ export interface SolanaTransactionResult {
   meta: SolanaTransactionMeta;
   transaction: SolanaTransaction;
   version: number;
+}
+
+export interface FogoscanBlockInstruction {
+  programId: string;
+  accounts: number[];
+  data: string;
+  stackHeight: number;
+}
+
+export interface FogoscanBlockTransactionMeta {
+  computeUnitsConsumed: number;
+  err: null | unknown;
+  fee: number;
+  innerInstructions: unknown[];
+  logMessages: string[];
+  postBalances: number[];
+  postTokenBalances: unknown[];
+  preBalances: number[];
+  preTokenBalances: unknown[];
+  rewards: unknown[] | null;
+  status: { Ok: null } | { Err: unknown };
+}
+
+export interface FogoscanBlockTransaction {
+  transaction: {
+    signatures: string[];
+    message: {
+      accountKeys: FogoscanAccountKey[];
+      header: SolanaMessageHeader | null;
+      instructions: FogoscanBlockInstruction[];
+      recentBlockhash: string;
+    };
+  };
+  meta: FogoscanBlockTransactionMeta;
+  version: number | string;
+}
+
+export interface FogoscanBlockDetailData {
+  blockHeight: number;
+  blockTime: number;
+  slot: number;
+  blockhash: string;
+  parentSlot: number;
+  previousBlockhash: string;
+  transactions: FogoscanBlockTransaction[];
+}
+
+export interface FogoscanBlockDetailResponse {
+  success: boolean;
+  data: FogoscanBlockDetailData;
+}
+
+export interface SolanaBlockResult {
+  blockHeight: number;
+  blockTime: number;
+  blockhash: string;
+  parentSlot: number;
+  previousBlockhash: string;
+  transactions: {
+    meta: SolanaTransactionMeta;
+    transaction: SolanaTransaction;
+    version: number | string;
+  }[];
 }

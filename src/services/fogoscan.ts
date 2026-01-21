@@ -1,6 +1,6 @@
 import { config } from '../config.js';
 import { HttpStatus } from '../constants.js';
-import type { FogoscanTransactionResponse } from '../types.js';
+import type { FogoscanTransactionResponse, FogoscanBlockDetailResponse } from '../types.js';
 
 async function fetchFromFogoscan<T>(path: string, label: string): Promise<T | null> {
   const url = `${config.fogoscanApiUrl}${path}`;
@@ -31,7 +31,6 @@ export async function getTransaction(sig: string): Promise<FogoscanTransactionRe
   return fetchFromFogoscan(`/v1/transaction/detail?tx=${sig}`, `tx=${sig.slice(0, 12)}...`);
 }
 
-export async function getBlockTransactions(slot: number): Promise<FogoscanTransactionResponse[] | null> {
-  const result = await fetchFromFogoscan<{ data: FogoscanTransactionResponse[] }>(`/v1/block/transactions?block=${slot}`, `block=${slot}`);
-  return result?.data ?? null;
+export async function getBlockDetail(slot: number): Promise<FogoscanBlockDetailResponse | null> {
+  return fetchFromFogoscan(`/v1/block/detail?block=${slot}`, `block=${slot}`);
 }

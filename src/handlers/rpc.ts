@@ -1,8 +1,9 @@
 import type { JsonRpcRequest, JsonRpcResponse } from '../types.js';
 import { rpcResult, rpcError } from '../types.js';
 import { RpcErrorCode } from '../constants.js';
-import { getTransaction, getBlockTransactions } from '../services/fogoscan.js';
+import { getTransaction, getBlockDetail } from '../services/fogoscan.js';
 import { transformTransaction } from '../transformers/transaction.js';
+import { transformBlock } from '../transformers/block.js';
 import { proxyRequest } from '../services/rpc-proxy.js';
 
 function elapsedMs(start: number): number {
@@ -43,15 +44,12 @@ export async function handleRpcRequest(request: JsonRpcRequest): Promise<JsonRpc
         return rpcError(id, RpcErrorCode.INVALID_PARAMS, 'missing slot');
       }
 
-      const transactions = await getBlockTransactions(slot);
+      const result = await getBlockDetail(slot);
       const ms = elapsedMs(start);
 
-      if (transactions) {
-        console.log(`getBlock ${slot} txs=${transactions.length} ${ms}ms`);
-        return rpcResult(id, {
-          blockHeight: slot,
-          transactions: transactions.map(transformTransaction),
-        });
+      if (result) {
+        console.log(`getBlock ${slot} txs=${result.data.transactions.length} ${ms}ms`);
+        return rpcResult(id, transformBlock(result));
       }
 
       console.log(`getBlock ${slot} not found ${ms}ms`);

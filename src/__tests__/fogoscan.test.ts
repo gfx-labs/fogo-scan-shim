@@ -1,5 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import { getTransaction, getBlockTransactions } from '../services/fogoscan.js';
+import { getTransaction, getBlockDetail } from '../services/fogoscan.js';
 
 const mockFetch = jest.fn<typeof fetch>();
 global.fetch = mockFetch;
@@ -73,33 +73,33 @@ describe('fogoscan service', () => {
     });
   });
 
-  describe('getBlockTransactions', () => {
+  describe('getBlockDetail', () => {
     it('returns data on success', async () => {
       const mockData = {
         success: true,
-        data: [{ trans_id: 'tx1' }, { trans_id: 'tx2' }],
+        data: { blockHeight: 12345, transactions: [] },
       };
 
       mockFetch.mockResolvedValue(mockResponse(mockData, { ok: true }));
 
-      const result = await getBlockTransactions(12345);
-      expect(result).toEqual(mockData.data);
+      const result = await getBlockDetail(12345);
+      expect(result).toEqual(mockData);
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/v1/block/transactions?block=12345')
+        expect.stringContaining('/v1/block/detail?block=12345')
       );
     });
 
     it('returns null on 404', async () => {
       mockFetch.mockResolvedValue(mockResponse({}, { ok: false, status: 404 }));
 
-      const result = await getBlockTransactions(99999);
+      const result = await getBlockDetail(99999);
       expect(result).toBeNull();
     });
 
     it('returns null on fetch error', async () => {
       mockFetch.mockRejectedValue(new Error('network error'));
 
-      const result = await getBlockTransactions(12345);
+      const result = await getBlockDetail(12345);
       expect(result).toBeNull();
     });
   });

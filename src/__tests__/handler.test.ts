@@ -1,13 +1,13 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
-import type { FogoscanTransactionResponse, JsonRpcResponse } from '../types.js';
+import type { FogoscanTransactionResponse, FogoscanBlockDetailResponse, JsonRpcResponse } from '../types.js';
 
 const mockGetTransaction = jest.fn<() => Promise<FogoscanTransactionResponse | null>>();
-const mockGetBlockTransactions = jest.fn<() => Promise<FogoscanTransactionResponse[] | null>>();
+const mockGetBlockDetail = jest.fn<() => Promise<FogoscanBlockDetailResponse | null>>();
 const mockProxyRequest = jest.fn<(req: unknown) => Promise<JsonRpcResponse>>();
 
 jest.unstable_mockModule('../services/fogoscan.js', () => ({
   getTransaction: mockGetTransaction,
-  getBlockTransactions: mockGetBlockTransactions,
+  getBlockDetail: mockGetBlockDetail,
 }));
 
 jest.unstable_mockModule('../services/rpc-proxy.js', () => ({
@@ -100,6 +100,43 @@ describe('handleRpcRequest', () => {
   });
 
   describe('getBlock', () => {
+    const mockBlockResponse: FogoscanBlockDetailResponse = {
+      success: true,
+      data: {
+        blockHeight: 161800848,
+        blockTime: 1765738852,
+        slot: 161800900,
+        blockhash: 'blockhash123',
+        parentSlot: 161800899,
+        previousBlockhash: 'prevhash123',
+        transactions: [{
+          transaction: {
+            signatures: ['sig1'],
+            message: {
+              accountKeys: [{ pubkey: 'key1', writable: true, signer: true, source: 'transaction' }],
+              header: null,
+              instructions: [{ programId: 'key1', accounts: [], data: 'data', stackHeight: 1 }],
+              recentBlockhash: 'hash',
+            },
+          },
+          meta: {
+            computeUnitsConsumed: 100,
+            err: null,
+            fee: 1000,
+            innerInstructions: [],
+            logMessages: [],
+            postBalances: [100],
+            postTokenBalances: [],
+            preBalances: [200],
+            preTokenBalances: [],
+            rewards: null,
+            status: { Ok: null },
+          },
+          version: 0,
+        }],
+      },
+    };
+
     it('returns error when slot missing', async () => {
       const result = await handleRpcRequest({
         jsonrpc: '2.0',
@@ -112,7 +149,7 @@ describe('handleRpcRequest', () => {
     });
 
     it('returns null when block not found', async () => {
-      mockGetBlockTransactions.mockResolvedValue(null);
+      mockGetBlockDetail.mockResolvedValue(null);
 
       const result = await handleRpcRequest({
         jsonrpc: '2.0',
@@ -125,22 +162,7 @@ describe('handleRpcRequest', () => {
     });
 
     it('returns block with transactions when found', async () => {
-      const mockTx: FogoscanTransactionResponse = {
-        success: true,
-        data: {
-          trans_id: 'tx1',
-          block_id: 161800848,
-          trans_time: 1765738852,
-          fee: 1000,
-          logMessage: [],
-          sol_bal_change: [],
-          account_keys: [],
-          parsed_instructions: [],
-          recentBlockhash: 'hash',
-          status: 1,
-        },
-      };
-      mockGetBlockTransactions.mockResolvedValue([mockTx]);
+      mockGetBlockDetail.mockResolvedValue(mockBlockResponse);
 
       const result = await handleRpcRequest({
         jsonrpc: '2.0',

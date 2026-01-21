@@ -1,22 +1,14 @@
 import type { FogoscanTransactionResponse, SolanaTransactionResult, SolanaInstruction, FogoscanAccountKey } from '../types.js';
 import { FogoscanStatus, SolanaDefaults } from '../constants.js';
 
-function extractBalances(balanceChanges: { pre_balance?: number; post_balance?: number }[]): {
-  preBalances: number[];
-  postBalances: number[];
-} {
-  const preBalances: number[] = [];
-  const postBalances: number[] = [];
-
-  for (const bal of balanceChanges) {
-    preBalances.push(bal.pre_balance ?? 0);
-    postBalances.push(bal.post_balance ?? 0);
-  }
-
-  return { preBalances, postBalances };
+function extractBalances(changes: { pre_balance?: number; post_balance?: number }[]) {
+  return {
+    preBalances: changes.map((b) => b.pre_balance ?? 0),
+    postBalances: changes.map((b) => b.post_balance ?? 0),
+  };
 }
 
-function buildMessageHeader(accountKeys: FogoscanAccountKey[]) {
+export function buildMessageHeader(accountKeys: FogoscanAccountKey[]) {
   const signers = accountKeys.filter((k) => k.signer);
   const readonlySigners = signers.filter((k) => !k.writable);
   const readonlyUnsigned = accountKeys.filter((k) => !k.signer && !k.writable);
@@ -39,7 +31,7 @@ export function transformTransaction(fogoscan: FogoscanTransactionResponse): Sol
   const instructions: SolanaInstruction[] = (data.parsed_instructions || []).map((inst) => ({
     programIdIndex: pubkeyList.indexOf(inst.program_id),
     accounts: inst.accounts?.map((acc) => pubkeyList.indexOf(acc)) ?? [],
-    data: inst.data_raw || '',
+    data: typeof inst.data_raw === 'string' ? inst.data_raw : '',
     stackHeight: SolanaDefaults.STACK_HEIGHT,
   }));
 
