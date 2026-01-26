@@ -1,9 +1,10 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import type { FogoscanTransactionResponse, FogoscanBlockDetailResponse, JsonRpcResponse } from '../types.js';
+import type { RawProxyResponse } from '../services/rpc-proxy.js';
 
 const mockGetTransaction = jest.fn<() => Promise<FogoscanTransactionResponse | null>>();
 const mockGetBlockDetail = jest.fn<() => Promise<FogoscanBlockDetailResponse | null>>();
-const mockProxyRequest = jest.fn<(req: unknown) => Promise<JsonRpcResponse>>();
+const mockProxyRequest = jest.fn<(body: string) => Promise<RawProxyResponse>>();
 
 jest.unstable_mockModule('../services/fogoscan.js', () => ({
   getTransaction: mockGetTransaction,
@@ -16,6 +17,10 @@ jest.unstable_mockModule('../services/rpc-proxy.js', () => ({
 
 const { handleRpcRequest } = await import('../handlers/rpc.js');
 
+function isJsonRpcResponse(result: JsonRpcResponse | RawProxyResponse): result is JsonRpcResponse {
+  return !('raw' in result);
+}
+
 describe('handleRpcRequest', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -24,9 +29,8 @@ describe('handleRpcRequest', () => {
   describe('getHealth', () => {
     it('proxies to public RPC', async () => {
       mockProxyRequest.mockResolvedValue({
-        jsonrpc: '2.0',
-        id: 1,
-        result: 'ok',
+        raw: true,
+        body: '{"jsonrpc":"2.0","id":1,"result":"ok"}',
       });
 
       const request = {
@@ -34,10 +38,12 @@ describe('handleRpcRequest', () => {
         id: 1,
         method: 'getHealth',
       };
-      const result = await handleRpcRequest(request);
+      const rawBody = JSON.stringify(request);
+      const result = await handleRpcRequest(request, rawBody);
 
-      expect(mockProxyRequest).toHaveBeenCalledWith(request);
-      expect(result.result).toBe('ok');
+      expect(mockProxyRequest).toHaveBeenCalledWith(rawBody);
+      expect('raw' in result && result.raw).toBe(true);
+      expect('body' in result && result.body).toContain('"result":"ok"');
     });
   });
 
@@ -59,43 +65,46 @@ describe('handleRpcRequest', () => {
     };
 
     it('returns error when signature missing', async () => {
-      const result = await handleRpcRequest({
+      const request = {
         jsonrpc: '2.0',
         id: 1,
         method: 'getTransaction',
         params: [],
-      });
+      };
+      const result = await handleRpcRequest(request, JSON.stringify(request));
 
-      expect(result.error?.code).toBe(-32602);
-      expect(result.error?.message).toBe('missing signature');
+      expect(isJsonRpcResponse(result) && result.error?.code).toBe(-32602);
+      expect(isJsonRpcResponse(result) && result.error?.message).toBe('missing signature');
     });
 
     it('returns transformed tx when found', async () => {
       mockGetTransaction.mockResolvedValue(mockTxResponse);
 
-      const result = await handleRpcRequest({
+      const request = {
         jsonrpc: '2.0',
         id: 1,
         method: 'getTransaction',
         params: ['5gB15Z6S7ev7s1iv818RHrMY1uD54HHEukjBXtmusdmPHjTFzEFx3EUtJY9L9ijMHhqA5veGzttXvuhq6DUik31X'],
-      });
+      };
+      const result = await handleRpcRequest(request, JSON.stringify(request));
 
-      expect(result.result).toBeDefined();
-      expect((result.result as any).slot).toBe(161800848);
-      expect((result.result as any).meta.fee).toBe(6431);
+      expect(isJsonRpcResponse(result) && result.result).toBeDefined();
+      expect(isJsonRpcResponse(result) && (result.result as any).slot).toBe(161800848);
+      expect(isJsonRpcResponse(result) && (result.result as any).meta.fee).toBe(6431);
     });
 
     it('returns null when tx not found', async () => {
       mockGetTransaction.mockResolvedValue(null);
 
-      const result = await handleRpcRequest({
+      const request = {
         jsonrpc: '2.0',
         id: 1,
         method: 'getTransaction',
         params: ['notfound'],
-      });
+      };
+      const result = await handleRpcRequest(request, JSON.stringify(request));
 
-      expect(result.result).toBeNull();
+      expect(isJsonRpcResponse(result) && result.result).toBeNull();
     });
   });
 
@@ -138,50 +147,52 @@ describe('handleRpcRequest', () => {
     };
 
     it('returns error when slot missing', async () => {
-      const result = await handleRpcRequest({
+      const request = {
         jsonrpc: '2.0',
         id: 1,
         method: 'getBlock',
         params: [],
-      });
+      };
+      const result = await handleRpcRequest(request, JSON.stringify(request));
 
-      expect(result.error?.code).toBe(-32602);
+      expect(isJsonRpcResponse(result) && result.error?.code).toBe(-32602);
     });
 
     it('returns null when block not found', async () => {
       mockGetBlockDetail.mockResolvedValue(null);
 
-      const result = await handleRpcRequest({
+      const request = {
         jsonrpc: '2.0',
         id: 1,
         method: 'getBlock',
         params: [161800848],
-      });
+      };
+      const result = await handleRpcRequest(request, JSON.stringify(request));
 
-      expect(result.result).toBeNull();
+      expect(isJsonRpcResponse(result) && result.result).toBeNull();
     });
 
     it('returns block with transactions when found', async () => {
       mockGetBlockDetail.mockResolvedValue(mockBlockResponse);
 
-      const result = await handleRpcRequest({
+      const request = {
         jsonrpc: '2.0',
         id: 1,
         method: 'getBlock',
         params: [161800848],
-      });
+      };
+      const result = await handleRpcRequest(request, JSON.stringify(request));
 
-      expect((result.result as any).blockHeight).toBe(161800848);
-      expect((result.result as any).transactions).toHaveLength(1);
+      expect(isJsonRpcResponse(result) && (result.result as any).blockHeight).toBe(161800848);
+      expect(isJsonRpcResponse(result) && (result.result as any).transactions).toHaveLength(1);
     });
   });
 
   describe('proxied methods', () => {
     it('proxies unknown methods to public RPC', async () => {
       mockProxyRequest.mockResolvedValue({
-        jsonrpc: '2.0',
-        id: 1,
-        result: 123456789,
+        raw: true,
+        body: '{"jsonrpc":"2.0","id":1,"result":123456789}',
       });
 
       const request = {
@@ -189,10 +200,12 @@ describe('handleRpcRequest', () => {
         id: 1,
         method: 'getSlot',
       };
-      const result = await handleRpcRequest(request);
+      const rawBody = JSON.stringify(request);
+      const result = await handleRpcRequest(request, rawBody);
 
-      expect(mockProxyRequest).toHaveBeenCalledWith(request);
-      expect(result.result).toBe(123456789);
+      expect(mockProxyRequest).toHaveBeenCalledWith(rawBody);
+      expect('raw' in result && result.raw).toBe(true);
+      expect('body' in result && result.body).toContain('"result":123456789');
     });
   });
 });

@@ -10,16 +10,33 @@ const fastify = Fastify({ logger: false });
 
 await fastify.register(cors);
 
+fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+  try {
+    const json = JSON.parse(body as string);
+    json._rawBody = body;
+    done(null, json);
+  } catch (err) {
+    done(err as Error, undefined);
+  }
+});
+
 fastify.get('/health', async () => ({ status: 'ok' }));
 
 fastify.post('/', async (request, reply) => {
-  const body = request.body as JsonRpcRequest;
+  const body = request.body as JsonRpcRequest & { _rawBody?: string };
+  const rawBody = body?._rawBody ?? JSON.stringify(body);
 
   if (!body?.method) {
     return reply.status(400).send(rpcError(null, RpcErrorCode.INVALID_REQUEST, 'Invalid Request'));
   }
 
-  return handleRpcRequest(body);
+  const result = await handleRpcRequest(body, rawBody);
+
+  if ('raw' in result) {
+    return reply.type('application/json').send(result.body);
+  }
+
+  return result;
 });
 
 await fastify.listen({ port: config.port, host: '0.0.0.0' });
