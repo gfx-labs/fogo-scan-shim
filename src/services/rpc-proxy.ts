@@ -1,16 +1,23 @@
+import JSONBig from 'json-bigint';
 import { config } from '../config.js';
+import type { JsonRpcRequest, JsonRpcResponse } from '../types.js';
 
-export interface RawProxyResponse {
-  raw: true;
-  body: string;
-}
+const jsonBig = JSONBig({ useNativeBigInt: true, alwaysParseAsBig: true });
 
-export async function proxyRequest(body: string): Promise<RawProxyResponse> {
+export async function proxyRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
   const response = await fetch(config.publicRpcUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body,
+    body: JSON.stringify(request),
   });
 
-  return { raw: true, body: await response.text() };
+  const text = await response.text();
+  const parsed = jsonBig.parse(text);
+
+  return {
+    jsonrpc: '2.0',
+    id: request.id,
+    result: parsed.result,
+    error: parsed.error,
+  };
 }

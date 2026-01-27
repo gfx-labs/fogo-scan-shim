@@ -16,11 +16,13 @@
   "dependencies": {
     "@fastify/cors": "^10.0.1",
     "dotenv": "^16.4.7",
-    "fastify": "^5.1.0"
+    "fastify": "^5.1.0",
+    "json-bigint": "^1.0.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
     "@types/jest": "^29.5.14",
+    "@types/json-bigint": "^1.0.4",
     "@types/node": "^22.10.2",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
