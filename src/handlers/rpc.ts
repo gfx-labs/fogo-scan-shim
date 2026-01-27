@@ -4,7 +4,7 @@ import { RpcErrorCode } from '../constants.js';
 import { getTransaction, getBlockDetail } from '../services/fogoscan.js';
 import { transformTransaction } from '../transformers/transaction.js';
 import { transformBlock } from '../transformers/block.js';
-import { proxyRequest, type RawProxyResponse } from '../services/rpc-proxy.js';
+import { proxyRequest } from '../services/rpc-proxy.js';
 
 function elapsedMs(start: number): number {
   return Date.now() - start;
@@ -14,7 +14,7 @@ function truncateSignature(sig: string): string {
   return `${sig.slice(0, 12)}...`;
 }
 
-export async function handleRpcRequest(request: JsonRpcRequest, rawBody: string): Promise<JsonRpcResponse | RawProxyResponse> {
+export async function handleRpcRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
   const { method, params, id } = request;
   const start = Date.now();
 
@@ -58,7 +58,7 @@ export async function handleRpcRequest(request: JsonRpcRequest, rawBody: string)
 
     default: {
       console.log(`proxying method: ${method}`);
-      return proxyRequest(rawBody);
+      return proxyRequest(request);
     }
   }
 }
